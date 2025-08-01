@@ -1,24 +1,21 @@
 from rest_framework import serializers
-from .models import CustomUser
+from .models import CustomUser, Post
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ('id', 'email', "first_name", "last_name")
-        read_only_fields = ['id', "email"]
+        fields = ['id', 'email', 'first_name', 'last_name', 'role']
+        read_only_fields = ['id', 'email', 'role']
+
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
-    password2 = serializers.CharField(write_only=True, min_length=8)
+    password = serializers.CharField(write_only=True)
+    password2 = serializers.CharField(write_only=True)
 
     class Meta:
         model = CustomUser
-        fields = ('email', "first_name", "last_name", "password", "password2")
-
-    def validate_email(self, value):
-        if CustomUser.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Этот email уже зарегистрирован.")
-        return value
+        fields = ['email', 'first_name', 'last_name', 'password', 'password2']
 
     def validate(self, data):
         if data['password'] != data['password2']:
@@ -27,10 +24,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password2')
-        user = CustomUser.objects.create_user(
-            email=validated_data['email'],
-            password=validated_data['password'],
-            first_name=validated_data['first_name', ''],
-            last_name=validated_data['last_name', ''],
-        )
-        return user
+        return CustomUser.objects.create_user(**validated_data)
+
+
+class PostSerializer(serializers.ModelSerializer):
+    owner = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = Post
+        fields = ['id', 'title', 'content', 'owner', 'created_at']
+        read_only_fields = ['id', 'owner', 'created_at']
