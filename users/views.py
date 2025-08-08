@@ -6,7 +6,6 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import CustomUser, Post
-
 from .serializers import (
     RegisterSerializer,
     UserSerializer,
@@ -16,7 +15,9 @@ from .serializers import (
 )
 
 from .permissions import IsOwnerOrReadOnly, IsAdmin, IsOwnerOrAdmin
-
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import logout
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -30,9 +31,9 @@ class UserListView(generics.ListAPIView):
     permission_classes = [IsAdmin]
 
 
-class UserProfileView(generics.RetrieveAPIView):
+class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
 
     def get_object(self):
         return self.request.user
@@ -42,7 +43,6 @@ class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdmin]
-
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -67,7 +67,7 @@ class LogoutView(APIView):
 
     def post(self, request):
         try:
-            refresh_token = request.data['refresh']
+            refresh_token = request.data["refresh"]
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response({"detail": "Вы вышли из системы."}, status=status.HTTP_205_RESET_CONTENT)
@@ -88,6 +88,25 @@ class ChangePasswordView(APIView):
 
             user.set_password(serializer.validated_data['new_password'])
             user.save()
-            return Response({"detail": "Пароль успешно изменён."},status=status.HTTP_200_OK)
+            return Response({"detail": "Пароль успешно изменён."}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+def login_page(request):
+    print("Текущий пользователь:", request.user)
+    return render(request, 'login.html')
+
+
+def home_view(request):
+    return render(request, 'home.html', {'user': request.user})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('login-page')
+
+
+def force_logout_before_login(request, provider):
+    logout(request)
+    return redirect(f'/auth/login/{provider}/')
