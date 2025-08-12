@@ -6,6 +6,7 @@ cryptography==45.0.6
 defusedxml==0.7.1
 Django==5.2.4
 django-jazzmin==3.0.1
+django-redis==6.0.0
 djangorestframework==3.16.0
 djangorestframework_simplejwt==5.5.1
 idna==3.10
@@ -14,6 +15,7 @@ pycparser==2.22
 PyJWT==2.10.1
 python-decouple==3.8
 python3-openid==3.2.0
+redis==6.4.0
 requests==2.32.4
 requests-oauthlib==2.0.0
 social-auth-app-django==5.5.1
