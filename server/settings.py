@@ -19,10 +19,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+
     'social_django',
+
+    'django_celery_results',
+    'django_celery_beat',
 
     'redisapp',
     'users',
@@ -224,3 +229,26 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='EMAIL_HOST_USER')
 
 PUBLIC_BASE_URL = config('PUBLIC_BASE_URL', default='http://127.0.0.1:8000')
+
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Bishkek'
+CELERY_ENABLE_UTC = True
+CELERY_TASK_ROUTES = {
+    "redisapp.tasks.send_email_task": {"queue": "emails"},
+    "redisapp.tasks.send_bulk_emails_task": {"queue": "emails"},
+}
+
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'daily-cache-clean': {
+        'task': 'redisapp.tasks.clean_cache',
+        'schedule': crontab(hour=3, minute=30),
+        'args': [],
+    },
+}
