@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+
+import drf_spectacular
 from decouple import config, Csv
 from datetime import timedelta
 
@@ -28,6 +30,9 @@ INSTALLED_APPS = [
 
     'django_celery_results',
     'django_celery_beat',
+
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
 
     'redisapp',
     'users',
@@ -136,7 +141,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ]
+    ],
+
+    'DEFAULT_SCHEMA_CLASSES': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SIMPLE_JWT = {
@@ -251,4 +258,40 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=3, minute=30),
         'args': [],
     },
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'API документация',
+    'DESCRIPTION': 'Автогенерация OpenAPI 3.0 для нашего Django REST API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAllowAny'],
+    'SWAGGER_UI_SETTINGS': {'persistAuthorization': True},
+    'SECURITY': [{'BearerAuth': []}],
+    'SECURITY_SCHEMES': {
+        'BearerAuth': {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+        }
+    },
+    'SERVERS': [
+        {'url': 'http://127.0.0.1:8000/', 'description': 'local_dev'},
+        {'url': 'http://api.example.com', 'description': 'Production'},
+    ],
+    'CONTACT': {
+        'name': 'API Support',
+        'email': 'bad.stack@gmail.com',
+        'url': 'https://t.me/ar_nursultan',
+    },
+    'LICENSE': {
+        'name': 'MIT',
+        'url': 'https://opensource.org/license/MIT',
+    },
+    'EXCLUDE_PATHS': [
+        r'^/admin/',
+        r'^/login-page/',
+        r'^/logout/',
+        r'^/auth/'
+    ],
 }
