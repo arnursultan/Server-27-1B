@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 import os
 import time
 import uuid
@@ -9,9 +10,9 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.core.mail import send_mail
 
 from users.models import Post
+from redisapp.tasks import send_email_task
 
 User = get_user_model()
 
@@ -26,11 +27,15 @@ def _user_display(user):
     return name or getattr(user, "email", "") or f"user-{user.id}"
 
 @require_GET
+@extend_schema(summary='Проверка соединения с Redis')
+@extend_schema(summary='Ping Redis')
 def ping_redis(request):
     r = _redis_client()
     return JsonResponse({"redis": "ok" if r.ping() else "down"})
 
 @require_GET
+@extend_schema(summary='Кэшированный подсчёт постов')
+@extend_schema(summary='Кэш: количество постов')
 def cached_posts_count(request):
     cache_key = "posts_count_demo"
     value = cache.get(cache_key)
@@ -44,6 +49,8 @@ def cached_posts_count(request):
     return JsonResponse({"posts_count": value, "source": src})
 
 @require_GET
+@extend_schema(summary='Счётчик запросов пользователя')
+@extend_schema(summary='Счётчик хитов')
 def hit_counter(request):
     r = _redis_client()
     user_part = request.user.id if request.user.is_authenticated else "anon"
@@ -53,6 +60,15 @@ def hit_counter(request):
     return JsonResponse({"hits": hits, "ttl_sec": r.ttl(key)})
 
 @require_GET
+@extend_schema(summary='Очистка всего кэша')
+@extend_schema(summary='Очистка кэша')
+def clear_cache(request):
+    cache.clear()
+    return JsonResponse({"cleared": True})
+
+@require_GET
+@extend_schema(summary='Отправка письма для подтверждения email')
+@extend_schema(summary='Отправка письма подтверждения')
 def send_email_verification(request, user_id):
     user = get_object_or_404(User, id=user_id)
     if user.is_active:
@@ -64,16 +80,25 @@ def send_email_verification(request, user_id):
     r = _redis_client()
     token = str(uuid.uuid4())
     key = f"email_verify:{token}"
-    r.set(key, user,id, ex=600)
+    r.set(key, user.id, ex=600)
 
     base = getattr(settings, "PUBLIC_BASE_URL", "http://127.0.0.1:8000")
     link = f"{base}/api/redis/verify-email/{token}/"
 
-    send_mail(
-        subject="Verify your account",
-        message=f"Hello {_user_display(user) }, please verify your account: {link}",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=False,
+    async_result = send_email_task.apply_async(
+        kwargs=dict(
+            subject="Verify your account",
+            to=[user.email],
+            from_email=None,
+            body=f"Hello { _user_display(user) }, please verify your account: {link}",
+        ),
+        queue="emails",
+        countdown=0,
+        expires=60 * 60,
+    )
 
-    return JsonResponse({"status": "email sent", "ttl_sec": r.ttl(key)})
+    return JsonResponse({
+        "status": "email queued",
+        "ttl_sec": r.ttl(key),
+        "task_id": async_result.id,
+    })

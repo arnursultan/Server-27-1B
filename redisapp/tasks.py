@@ -74,7 +74,7 @@ def _filter_valid_emails(recipients: Iterable[str]) -> list[str]:
         else:
             logger.warning(f"[Email Filter] Skipped invalid address: {r!r}")
     filtered_list = list(dict.fromkeys(valid_emails))
-    logger.info(f"[Email Filter] Input: {raw_list} -> {filtered_list}")
+    logger.info(f"[Email Filter] Input: {raw_list} -> Valid: {filtered_list}")
     return filtered_list
 
 @shared_task(bind=True, base=BaseRetryTask, rate_limit="30/m", queue="emails")
@@ -102,7 +102,7 @@ def send_email_task(
 
     recipients = _filter_valid_emails(to)
     if not recipients:
-        logger.warning("send_email_task: no valid recipiend after filtering")
+        logger.warning("send_email_task: no valid recipients after filtering")
         return {"sent": 0, "to": []}
 
     from_list = _filter_valid_emails([from_email] if from_email else [])
@@ -110,7 +110,7 @@ def send_email_task(
         from_email_clean = from_list[0]
     else:
         safe_default = "no-reply@example.com"
-        logger.warning(f"send_email_task: invalid from_email: '{from_email}', using safe default")
+        logger.warning(f"send_email_task: invalid from_email '{from_email}', using safe default '{safe_default}'")
         from_email_clean = safe_default
 
     headers_clean = dict(headers or {})
@@ -119,3 +119,54 @@ def send_email_task(
         if reply_to_filtered:
             headers_clean["Reply-To"] = reply_to_filtered[0]
         else:
+            logger.warning(f"send_email_task: removed invalid Reply-To: {headers_clean['Reply-To']}")
+            del headers_clean["Reply-To"]
+
+    idem_key = _make_idempotency_key(subject=subject, to=recipients, body=body, html=html)
+    if idempotent_ttl > 0 and not cache.add(idem_key, "1", timeout=idempotent_ttl):
+        logger.info("send_email_task: deduplicated by idempotency key %s", idem_key)
+        return {"sent": 0, "to": recipients, "deduplicated": True}
+
+    connection = get_connection()
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=body or "",
+        from_email=from_email_clean,
+        to=recipients,
+        headers=headers_clean,
+        connection=connection,
+    )
+    if html:
+        msg.attach_alternative(html, "text/html")
+    if attachments:
+        for filename, content, mimetype in attachments:
+            msg.attach(filename, content, mimetype)
+
+    sent = msg.send(fail_silently=False)
+    meta = {
+        "sent": int(sent),
+        "to": recipients,
+        "message_id": slugify(f"{subject}-{time.time()}")[:40],
+    }
+    logger.info("send_email_task: %s", meta)
+    return meta
+
+@shared_task(bind=True, base=BaseRetryTask, rate_limit="120/m", queue="emails")
+def send_bulk_emails_task(
+    self,
+    *,
+    subject: str,
+    to_batches: Sequence[Sequence[str]],
+    from_email: Optional[str] = None,
+    body: Optional[str] = None,
+    html: Optional[str] = None,
+) -> dict:
+    total = 0
+    for batch in to_batches:
+        res = send_email_task.apply_async(
+            kwargs=dict(subject=subject, to=batch, from_email=from_email, body=body, html=html),
+            queue="emails",
+        )
+        logger.debug("queued batch task_id=%s size=%d", res.id, len(batch))
+        total += len(batch)
+    return {"queued_recipients": total, "batches": len(to_batches)}
