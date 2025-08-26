@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-import drf_spectacular
 from decouple import config, Csv
 from datetime import timedelta
 

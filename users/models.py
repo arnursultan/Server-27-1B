@@ -44,8 +44,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = []
 
     def __str__(self):
-        return self.email
-
+        return self.email or f"User {self.pk}"
 
 class Post(models.Model):
     title = models.CharField(max_length=100)
@@ -53,5 +52,5 @@ class Post(models.Model):
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='posts')
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):a
+    def __str__(self):
         return self.title
