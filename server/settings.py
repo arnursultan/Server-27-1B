@@ -142,7 +142,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
 
-    'DEFAULT_SCHEMA_CLASSES': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SIMPLE_JWT = {
@@ -258,13 +258,12 @@ CELERY_BEAT_SCHEDULE = {
         'args': [],
     },
 }
-
 SPECTACULAR_SETTINGS = {
     'TITLE': 'API документация',
-    'DESCRIPTION': 'Автогенерация OpenAPI 3.0 для нашего Django REST API',
+    'DESCRIPTION': 'Автогенерация OpenAPI 3.0 для вашего Django REST API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAllowAny'],
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
     'SWAGGER_UI_SETTINGS': {'persistAuthorization': True},
     'SECURITY': [{'BearerAuth': []}],
     'SECURITY_SCHEMES': {
@@ -275,8 +274,8 @@ SPECTACULAR_SETTINGS = {
         }
     },
     'SERVERS': [
-        {'url': 'http://127.0.0.1:8000/', 'description': 'local_dev'},
-        {'url': 'http://api.example.com', 'description': 'Production'},
+        {'url': 'http://127.0.0.1:8000', 'description': 'Local dev'},
+        {'url': 'https://api.example.com', 'description': 'Production'},
     ],
     'CONTACT': {
         'name': 'API Support',
@@ -285,12 +284,12 @@ SPECTACULAR_SETTINGS = {
     },
     'LICENSE': {
         'name': 'MIT',
-        'url': 'https://opensource.org/license/MIT',
+        'url': 'https://opensource.org/licenses/MIT',
     },
     'EXCLUDE_PATHS': [
         r'^/admin/',
         r'^/login-page/',
         r'^/logout/',
-        r'^/auth/'
+        r'^/auth/',
     ],
 }
